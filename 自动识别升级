@@ -1,0 +1,124 @@
+Sub UpdateSheet2()
+    Dim ws1 As Worksheet, ws2 As Worksheet
+    Dim i As Long, j As Long
+    Dim statRange As Range, equipRange As Range, flagRange As Range
+    Dim statCount As Long, equipCount As Long
+    Dim stat As String, equip As String, identifier As String
+    Dim desiredIdentifiers As Collection
+    Dim existingIdentifiers As Object ' 字典
+    Dim lastRow As Long
+    Dim currentRow As Long
+    Dim identifierRow As Long
+    Dim key As Variant
+    Dim id As Variant ' 将 id 声明在过程的顶部
+    Dim startRow As Long, startCol As Long ' 起始位置变量
+    
+    ' 设置起始位置（您可以根据需要修改这里的值）
+    startRow = 7 ' 起始行号，例如从第7行开始
+    startCol = 2 ' 起始列号，列B为2，列C为3，以此类推
+    
+    Set ws1 = ThisWorkbook.Sheets("Sheet1")
+    Set ws2 = ThisWorkbook.Sheets("Sheet2")
+    
+    Set desiredIdentifiers = New Collection
+    Set existingIdentifiers = CreateObject("Scripting.Dictionary")
+    
+    ' 构建按顺序的标识符列表
+    Set statRange = ws1.Range("A2:A4") ' 调整范围
+    Set equipRange = ws1.Range("B1:D1") ' 调整范围
+    Set flagRange = ws1.Range("B2:D4")  ' 调整范围
+    
+    statCount = statRange.Rows.Count
+    equipCount = equipRange.Columns.Count
+    
+    For i = 1 To statCount
+        stat = statRange.Cells(i, 1).Value
+        For j = 1 To equipCount
+            equip = equipRange.Cells(1, j).Value
+            identifier = stat & " " & equip
+            If flagRange.Cells(i, j).Value = 1 Then
+                desiredIdentifiers.Add identifier
+            End If
+        Next j
+    Next i
+    
+    ' 读取Sheet2中的现有标识符
+    lastRow = ws2.Cells(ws2.Rows.Count, startCol).End(xlUp).Row
+    If lastRow < startRow Then lastRow = startRow - 1 ' 如果没有数据，设置为起始行之前
+    For i = startRow To lastRow
+        identifier = ws2.Cells(i, startCol).Value
+        If identifier <> "" Then
+            existingIdentifiers(identifier) = i ' 存储行号
+        End If
+    Next i
+    
+    ' 初始化当前行
+    currentRow = startRow
+    
+    ' 处理期望的标识符列表
+    For i = 1 To desiredIdentifiers.Count
+        identifier = desiredIdentifiers(i)
+        If existingIdentifiers.Exists(identifier) Then
+            identifierRow = existingIdentifiers(identifier)
+            If identifierRow <> currentRow Then
+                ' 将行移动到正确的位置
+                ws2.Rows(identifierRow).Cut
+                ws2.Rows(currentRow).Insert Shift:=xlDown
+                Application.CutCopyMode = False
+                ' 更新existingIdentifiers中的行号
+                If identifierRow > currentRow Then
+                    ' 行向下移动
+                    For Each id In existingIdentifiers.Keys
+                        If existingIdentifiers(id) >= currentRow And existingIdentifiers(id) < identifierRow Then
+                            existingIdentifiers(id) = existingIdentifiers(id) + 1
+                        End If
+                    Next id
+                Else
+                    ' 行向上移动
+                    For Each id In existingIdentifiers.Keys
+                        If existingIdentifiers(id) > identifierRow And existingIdentifiers(id) <= currentRow Then
+                            existingIdentifiers(id) = existingIdentifiers(id) - 1
+                        End If
+                    Next id
+                End If
+                ' 更新已移动标识符的行号
+                existingIdentifiers(identifier) = currentRow
+            End If
+            ' 从existingIdentifiers中移除已处理的标识符
+            existingIdentifiers.Remove identifier
+        Else
+            ' 在currentRow位置插入新行
+            ws2.Rows(currentRow).Insert Shift:=xlDown
+            ws2.Cells(currentRow, startCol).Value = identifier
+            ' 更新existingIdentifiers中行号大于等于currentRow的标识符的行号
+            For Each id In existingIdentifiers.Keys
+                If existingIdentifiers(id) >= currentRow Then
+                    existingIdentifiers(id) = existingIdentifiers(id) + 1
+                End If
+            Next id
+        End If
+        currentRow = currentRow + 1
+    Next i
+    
+    ' 删除Sheet2中多余的标识符行
+    If existingIdentifiers.Count > 0 Then
+        Dim rowsToDelete As Range
+        For Each key In existingIdentifiers.Keys
+            identifierRow = existingIdentifiers(key)
+            If rowsToDelete Is Nothing Then
+                Set rowsToDelete = ws2.Rows(identifierRow)
+            Else
+                Set rowsToDelete = Union(rowsToDelete, ws2.Rows(identifierRow))
+            End If
+        Next key
+        If Not rowsToDelete Is Nothing Then
+            rowsToDelete.Delete
+        End If
+    End If
+    
+    ' 删除currentRow之后的多余行（可选）
+    lastRow = ws2.Cells(ws2.Rows.Count, startCol).End(xlUp).Row
+    If lastRow > currentRow - 1 Then
+        ws2.Range(ws2.Rows(currentRow), ws2.Rows(lastRow)).Delete
+    End If
+End Sub
