@@ -1,0 +1,27 @@
+Sub ClearCellContents()
+    Dim userRange As String
+    Dim rng As Range
+    
+    On Error GoTo ErrorHandler
+    
+    ' 提示用户输入要清除内容的范围
+    userRange = InputBox("请输入要清除内容的单元格范围（例如：A1:B10）：", "清除单元格内容")
+    
+    ' 检查用户是否取消输入
+    If userRange = "" Then
+        MsgBox "操作已取消。", vbInformation
+        Exit Sub
+    End If
+    
+    ' 设置范围对象
+    Set rng = Range(userRange)
+    
+    ' 清除范围内的内容
+    rng.ClearContents
+    
+    MsgBox "成功清除范围 " & rng.Address & " 内的内容。", vbInformation
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "输入的范围无效，请检查后重试。", vbExclamation
+End Sub
